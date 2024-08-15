@@ -40,17 +40,17 @@ int rootNode = 1;
 
 struct Page
 {
-    vector<pair<int, int>> nodes;
+    vector<pair<int, int>> keys;
     int parent;
 };
 
 int size_of_page(Page page)
 {
     int sz = 4;
-    if (page.nodes.size() == 0) return sz;
+    if (page.keys.size() == 0) return sz;
 
     sz += 4;
-    sz += ((int)page.nodes.size()-1) * 8;
+    sz += ((int)page.keys.size()-1) * 8;
     return sz;
 }
 
@@ -69,8 +69,8 @@ int size_of_page(Page page)
 
 int search(int key, vector<Page> &memory, int cur_node)
 {
-    vector<pair<int,int>>& nodes = memory[cur_node].nodes; 
-    int left = 0, right = nodes.size();
+    vector<pair<int,int>>& keys = memory[cur_node].keys; 
+    int left = 0, right = keys.size();
     if (right == 0) return cur_node;
     right--;
 
@@ -81,7 +81,7 @@ int search(int key, vector<Page> &memory, int cur_node)
     {
         int mid = left + (right-left)/2;
 
-        if (nodes[mid].first <= key)
+        if (keys[mid].first <= key)
         {
             pos = mid;
             left = mid+1;
@@ -89,8 +89,8 @@ int search(int key, vector<Page> &memory, int cur_node)
         else right = mid-1;
     }
 
-    if (key == nodes[pos].first || nodes[pos].second == 0) return cur_node;
-    return search(key, memory, nodes[pos].second);
+    if (key == keys[pos].first || keys[pos].second == 0) return cur_node;
+    return search(key, memory, keys[pos].second);
 }
 
 /*
@@ -124,44 +124,44 @@ pair<int,int> overflow(vector<Page> &memory, int cur_node)
 
     memory[new_node].parent = memory[cur_node].parent;
 
-    vector<pair<int,int>>& cur_nodes = memory[cur_node].nodes;
-    vector<pair<int,int>>& new_nodes = memory[new_node].nodes; 
+    vector<pair<int,int>>& cur_keys = memory[cur_node].keys;
+    vector<pair<int,int>>& new_keys = memory[new_node].keys; 
 
-    new_nodes.emplace_back(-1e9, cur_nodes[median].second);
+    new_keys.emplace_back(-1e9, cur_keys[median].second);
 
-    for (int i = median+1; i<cur_nodes.size(); i++)
-        new_nodes.emplace_back(cur_nodes[i]);
+    for (int i = median+1; i<cur_keys.size(); i++)
+        new_keys.emplace_back(cur_keys[i]);
 
     // this step is important because, we give the child of all elements >= median to a new node.
     // meaning these children have a new parent now, so we update them ALL.
-    for (auto &[k, p] : new_nodes)
+    for (auto &[k, p] : new_keys)
         if (p) memory[p].parent = new_node;
 
-    pair<int, int> new_key = {cur_nodes[median].first, new_node};
+    pair<int, int> new_key = {cur_keys[median].first, new_node};
 
-    while (cur_nodes.size()>median) cur_nodes.pop_back();
+    while (cur_keys.size()>median) cur_keys.pop_back();
 
     return new_key;
 }
 
 void insert(pair<int, int> key, vector<Page> &memory, int cur_node)
 {
-    vector<pair<int,int>>& nodes = memory[cur_node].nodes;
+    vector<pair<int,int>>& keys = memory[cur_node].keys;
 
-    if (nodes.size() == 0)
+    if (keys.size() == 0)
     {
-        nodes.emplace_back(-1e9, 0);
-        nodes.emplace_back(key);
+        keys.emplace_back(-1e9, 0);
+        keys.emplace_back(key);
         return;
     }
 
-    int i = nodes.size();
-    nodes.emplace_back(key);
+    int i = keys.size();
+    keys.emplace_back(key);
     // i holds the current index of key
 
     while (1)
     {
-        if (nodes[i].first < nodes[i-1].first) swap(nodes[i], nodes[i-1]);
+        if (keys[i].first < keys[i-1].first) swap(keys[i], keys[i-1]);
         else break;
         i--;
     }
@@ -178,7 +178,7 @@ void insert(pair<int, int> key, vector<Page> &memory, int cur_node)
         memory.emplace_back(Page());
 
         memory[parent].parent = 0;
-        memory[parent].nodes.emplace_back(-1e9, cur_node);
+        memory[parent].keys.emplace_back(-1e9, cur_node);
 
         memory[cur_node].parent = parent;
         rootNode = parent;
@@ -192,18 +192,18 @@ void insert(pair<int, int> key, vector<Page> &memory, int cur_node)
 void inOrder(vector<Page> &memory, int page_num)
 {
     if (!page_num) return;
-    inOrder(memory, memory[page_num].nodes[0].second);
-    for (int i = 1; i < memory[page_num].nodes.size(); i++)
+    inOrder(memory, memory[page_num].keys[0].second);
+    for (int i = 1; i < memory[page_num].keys.size(); i++)
     {
-        cout << memory[page_num].nodes[i].first << '\n';
-        inOrder(memory, memory[page_num].nodes[i].second);
+        cout << memory[page_num].keys[i].first << '\n';
+        inOrder(memory, memory[page_num].keys[i].second);
     }
 }
 
 void prtPage(Page &page)
 {
     cout << "Parent: " << page.parent << '\n';
-    for (auto &[k, p] : page.nodes)
+    for (auto &[k, p] : page.keys)
         cout << "{ " << k << ", " << p << " }, ";
     cout << '\n';
 }
@@ -211,13 +211,13 @@ void prtPage(Page &page)
 int maxH(vector<Page> &memory, int cur_node, int d = 0)
 {
     if (cur_node == 0) return d-1;
-    vector<pair<int,int>> nodes = memory[cur_node].nodes;
+    vector<pair<int,int>> keys = memory[cur_node].keys;
 
-    if (nodes.size()==0) return d-1;
+    if (keys.size()==0) return d-1;
 
     int D = d;
-    for (int i = 0; i < nodes.size(); i++)
-        D = max(D, maxH(memory, nodes[i].second, d+1));
+    for (int i = 0; i < keys.size(); i++)
+        D = max(D, maxH(memory, keys[i].second, d+1));
 
     return D;
 }
@@ -230,7 +230,7 @@ int main()
 {
     vector<Page> memory(2);
     int pg;
-    
+
     for (int i = 1; i <= 1000000; i++)
     {
         pg = search(i, memory, rootNode);
