@@ -132,6 +132,11 @@ pair<int,int> overflow(vector<Page> &memory, int cur_node)
     for (int i = median+1; i<cur_nodes.size(); i++)
         new_nodes.emplace_back(cur_nodes[i]);
 
+    // this step is important because, we give the child of all elements >= median to a new node.
+    // meaning these children have a new parent now, so we update them ALL.
+    for (auto &[k, p] : new_nodes)
+        if (p) memory[p].parent = new_node;
+
     pair<int, int> new_key = {cur_nodes[median].first, new_node};
 
     while (cur_nodes.size()>median) cur_nodes.pop_back();
@@ -190,7 +195,7 @@ void inOrder(vector<Page> &memory, int page_num)
     inOrder(memory, memory[page_num].nodes[0].second);
     for (int i = 1; i < memory[page_num].nodes.size(); i++)
     {
-        cout << memory[page_num].nodes[i].first << ' ' << memory[page_num].nodes[i].second << '\n';
+        cout << memory[page_num].nodes[i].first << '\n';
         inOrder(memory, memory[page_num].nodes[i].second);
     }
 }
@@ -203,33 +208,34 @@ void prtPage(Page &page)
     cout << '\n';
 }
 
+int maxH(vector<Page> &memory, int cur_node, int d = 0)
+{
+    if (cur_node == 0) return d-1;
+    vector<pair<int,int>> nodes = memory[cur_node].nodes;
+
+    if (nodes.size()==0) return d-1;
+
+    int D = d;
+    for (int i = 0; i < nodes.size(); i++)
+        D = max(D, maxH(memory, nodes[i].second, d+1));
+
+    return D;
+}
+
+
+// pg = search(i, memory, rootNode);
+// insert({i,0}, memory, pg);
+
 int main()
 {
     vector<Page> memory(2);
-
     int pg;
-    vector<int> A = {6, 5, 7, 4, 8, 3, 9, 2, 10, 1, 11};
-
-    for (auto &a : A)
+    
+    for (int i = 1; i <= 1000000; i++)
     {
-        pg = search(a, memory, rootNode);
-        insert({a,0}, memory, pg);
-        cout << a << ' ' << pg << '\n';
-
-        for (int i = 0; i < memory.size(); i++)
-        {
-            cout << i << ": ";
-            prtPage(memory[i]);
-        }
+        pg = search(i, memory, rootNode);
+        insert({i,0}, memory, pg);
     }
 
-    // cout << memory[1].nodes.size() << '\n';
-    // for (auto &[k, p] : memory[1].nodes)
-    //     cout << k << ' ' << p << '\n';
-
-    // cout << size_of_page(memory[1]) << ' ';
-
-    inOrder(memory, rootNode);
-
-    
+    cout << maxH(memory, rootNode);
 }
