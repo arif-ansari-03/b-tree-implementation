@@ -189,6 +189,31 @@ void insert(pair<int, int> key, vector<Page> &memory, int cur_node)
     insert(new_key, memory, parent);
 }
 
+
+/* Now time for deletion:
+** Deletion is similar to insertion, we have underflow in deletion. There are two ways to solving an underflow, unlike overflow which usually only has 1 way to
+** deal with it. Before coming to the 2 ways, let's define the underflow state. 
+**
+** A node is in underflow state if:
+** 1. It is not the root node.
+** 2. It has occupied less than some amount of memory. 
+**
+** Choosing the "some amount of memory":
+** By "some amount of memory", I mean a fixed number, but in other implementations, where key size is fixed one may use number of keys as deciding factor. In this
+** implementation, a page has 32 bytes of memory, 4 bytes for parent, 4 bytes for left most pointer, remaining 24 bytes for 3 key, pointer pairs.
+** Defining lower bound for underflow is harder when in terms of memory. However, even in the extreme case, the B-tree should still be logarithmic, like a balanced
+** binary tree. The extreme case being only 1 key, pointer pair in each node.
+** It might be ok to keep underflow condition as less than 25% memory used rather than 50%. Because memory being less than 50% can easily happen when we split a node
+** in overflow state. Memory per page is 4KB and most of the time, entries are not bigger than 500 bytes (12.5% of memory). The parent pointer and the left most
+** pointer will take very little space, less than 5% ( about 1% to be more precise ) so we will have at least 7 keys in case of overflow, in this case when we
+** split, clearly at least 2 keys remain which is 25% (2 * 12.5%).
+** 
+** So 25% is a good underflow limit.
+** In this implementation however, the key size is fixed. In each node there are at most 3 keys, we can expect 1 key to remain in some node after splitting, so 
+** let's keep 1 key as the minimum size. That is 4 bytes for left most pointer, 4 for parent, 8 for 1 key,pointer pair. so 16 bytes is minimum.
+**
+*/
+
 void inOrder(vector<Page> &memory, int page_num)
 {
     if (!page_num) return;
@@ -202,7 +227,7 @@ void inOrder(vector<Page> &memory, int page_num)
 
 void prtPage(Page &page)
 {
-    cout << "Parent: " << page.parent << '\n';
+    cout << "Parent: " << page.parent << " size: " << size_of_page(page) << '\n';
     for (auto &[k, p] : page.keys)
         cout << "{ " << k << ", " << p << " }, ";
     cout << '\n';
@@ -222,6 +247,15 @@ int maxH(vector<Page> &memory, int cur_node, int d = 0)
     return D;
 }
 
+void prtMem(vector<Page> &memory)
+{
+    for (int i = 0; i < memory.size(); i++)
+    {
+        cout << i << ": ";
+        prtPage(memory[i]);
+    }
+}
+
 
 // pg = search(i, memory, rootNode);
 // insert({i,0}, memory, pg);
@@ -231,11 +265,12 @@ int main()
     vector<Page> memory(2);
     int pg;
 
-    for (int i = 1; i <= 1000000; i++)
+    for (int i = 1; i <= 10; i++)
     {
         pg = search(i, memory, rootNode);
         insert({i,0}, memory, pg);
+        prtMem(memory);
     }
 
-    cout << maxH(memory, rootNode);
+    
 }
