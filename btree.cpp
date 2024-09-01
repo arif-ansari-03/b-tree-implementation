@@ -33,16 +33,21 @@ using namespace std;
 ** about 4 bytes and that a page max size is say 40 bytes.
 ** Important thing to keep in mind is that we also have to store parent pointer,
 ** it also has to be added to current size of the page.
+**
+** For some reason I have done search and insertion recursively, which is pointless here. Planning to do deletion iteratively and
+** eventually update the search and insert functions to iterative nature.
 */
 
-// initially rootNode is 1 but we have to keep updating it if root is overflown.
-int rootNode = 1;
+// initially root_node is 1 but we have to keep updating it if root is overflown.
+int root_node = 1;
 
 struct Page
 {
     vector<pair<int, int>> keys;
     int parent;
 };
+
+vector<Page> memory;
 
 int size_of_page(Page page)
 {
@@ -67,19 +72,17 @@ int size_of_page(Page page)
 ** exists, then return its page. If it doesn't exist then find the leaf node where it must belong.
 */
 
-int search(int key, vector<Page> &memory, int cur_node)
+int search_node(int page_num, int key)
 {
-    vector<pair<int,int>>& keys = memory[cur_node].keys; 
+    vector<pair<int, int>> keys = memory[page_num].keys;
+    int pos = -1;
     int left = 0, right = keys.size();
-    if (right == 0) return cur_node;
     right--;
 
-    // pos is the largest index of the key in the current node
-    // such that this key is less than or equal to the key to be inserted.
-    int pos = 0;
+    int mid;
     while (left <= right)
     {
-        int mid = left + (right-left)/2;
+        mid = left + (right-left)/2;
 
         if (keys[mid].first <= key)
         {
@@ -89,8 +92,18 @@ int search(int key, vector<Page> &memory, int cur_node)
         else right = mid-1;
     }
 
-    if (key == keys[pos].first || keys[pos].second == 0) return cur_node;
-    return search(key, memory, keys[pos].second);
+    return pos;
+}
+
+int search(int key, int cur_node)
+{
+    vector<pair<int, int>> keys = memory[cur_node].keys;
+    // pos is the largest index of the key in the current node
+    // such that this key is less than or equal to the key to be inserted.
+    int pos = search_node(cur_node, key);
+
+    if (pos == -1 || key == keys[pos].first || keys[pos].second == 0) return cur_node;
+    return search(key, keys[pos].second);
 }
 
 /*
@@ -107,7 +120,7 @@ int search(int key, vector<Page> &memory, int cur_node)
 ** 
 */
 
-pair<int,int> overflow(vector<Page> &memory, int cur_node)
+pair<int,int> overflow(int cur_node)
 {
     int median = 0;
     int sz = size_of_page(memory[cur_node]);
@@ -144,7 +157,7 @@ pair<int,int> overflow(vector<Page> &memory, int cur_node)
     return new_key;
 }
 
-void insert(pair<int, int> key, vector<Page> &memory, int cur_node)
+void insert(pair<int, int> key, int cur_node)
 {
     vector<pair<int,int>>& keys = memory[cur_node].keys;
 
@@ -181,12 +194,12 @@ void insert(pair<int, int> key, vector<Page> &memory, int cur_node)
         memory[parent].keys.emplace_back(-1e9, cur_node);
 
         memory[cur_node].parent = parent;
-        rootNode = parent;
+        root_node = parent;
     }
 
-    pair<int,int> new_key = overflow(memory, cur_node);
+    pair<int,int> new_key = overflow(cur_node);
 
-    insert(new_key, memory, parent);
+    insert(new_key, parent);
 }
 
 
@@ -212,16 +225,54 @@ void insert(pair<int, int> key, vector<Page> &memory, int cur_node)
 ** In this implementation however, the key size is fixed. In each node there are at most 3 keys, we can expect 1 key to remain in some node after splitting, so 
 ** let's keep 1 key as the minimum size. That is 4 bytes for left most pointer, 4 for parent, 8 for 1 key,pointer pair. so 16 bytes is minimum.
 **
+** 
+** What happens when the root node becomes empty?
+** if the root node has become empty, it can happen if there was only 1 key in the root before deletion and then one of the two children
+** have propagated their deletion upwards. Meaning, that both the children node must be in bare minimum state, otherwise the child
+** which propagated the deletion upward would have borrowed from the sibling and there would be no propagation. So that means, we can
+** just merge the two children into one node and just assign the root to be that node. 
 */
 
-void inOrder(vector<Page> &memory, int page_num)
+// this function will return 1 if underflow is solved completely, that is node borrowed from sibling, otherwise return 0.
+// Returning 0 means the parent may now be in underflow. The way deletion() is implemented, underflow will never be called for
+// the root_node.
+bool underflow(int page_num)
+{
+    int parent = memory[page_num].parent;
+    int pos = search_node(parent, memory[page_num].back().first);
+}
+
+void Delete(int key)
+{
+    int page_num = search(key, root_node);
+    int pos = search_node(page_num, key);
+
+    if (pos <= 0) return;
+
+    // here predecessor is the inorder predecessor. Both successor and predecessor work as a replacement for the empty space created,
+    // it is on the developer.
+    int predecessor_page = search(key-1, memory[page_num].keys[pos-1].second);
+    int predecessor = memory[predecessor_page].keys.back().first;
+    memory[predecessor_page].keys.pop_back();
+
+    memory[page_num].keys[pos].first = predecessor;
+
+    page_num = predecessor_page;
+
+    while (size_of_page(memory[page_num]) <= 8)
+    {
+
+    }
+}
+
+void inOrder(int page_num)
 {
     if (!page_num) return;
-    inOrder(memory, memory[page_num].keys[0].second);
+    inOrder(memory[page_num].keys[0].second);
     for (int i = 1; i < memory[page_num].keys.size(); i++)
     {
         cout << memory[page_num].keys[i].first << '\n';
-        inOrder(memory, memory[page_num].keys[i].second);
+        inOrder(memory[page_num].keys[i].second);
     }
 }
 
@@ -233,7 +284,7 @@ void prtPage(Page &page)
     cout << '\n';
 }
 
-int maxH(vector<Page> &memory, int cur_node, int d = 0)
+int maxH(int cur_node, int d = 0)
 {
     if (cur_node == 0) return d-1;
     vector<pair<int,int>> keys = memory[cur_node].keys;
@@ -242,12 +293,12 @@ int maxH(vector<Page> &memory, int cur_node, int d = 0)
 
     int D = d;
     for (int i = 0; i < keys.size(); i++)
-        D = max(D, maxH(memory, keys[i].second, d+1));
+        D = max(D, maxH(keys[i].second, d+1));
 
     return D;
 }
 
-void prtMem(vector<Page> &memory)
+void prtMem()
 {
     for (int i = 0; i < memory.size(); i++)
     {
@@ -257,19 +308,19 @@ void prtMem(vector<Page> &memory)
 }
 
 
-// pg = search(i, memory, rootNode);
+// pg = search(i, memory, root_node);
 // insert({i,0}, memory, pg);
 
 int main()
 {
-    vector<Page> memory(2);
+    memory = vector<Page>(2);
     int pg;
 
-    for (int i = 1; i <= 10; i++)
+    for (int i = 1; i <= 30; i++)
     {
-        pg = search(i, memory, rootNode);
-        insert({i,0}, memory, pg);
-        prtMem(memory);
+        pg = search(i, root_node);
+        insert({i,0}, pg);
+        prtMem();
     }
 
     
